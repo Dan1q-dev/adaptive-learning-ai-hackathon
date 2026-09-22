@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { evaluateQuiz, generateQuiz } from "./mockApi";
+import { evaluateQuiz, generateQuiz, isDemoMode } from "./api";
 import type { EvaluateResponse, GenerateResponse, UserAnswer } from "./types";
 
 type Screen = "home" | "quiz" | "result";
@@ -11,6 +11,10 @@ const levelLabels = {
   intermediate: "Уверенный",
   advanced: "Продвинутый",
 };
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Произошла ошибка. Попробуйте ещё раз.";
+}
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -39,32 +43,43 @@ export default function App() {
     }
     setError("");
     setLoading(true);
-    const generated = await generateQuiz({ material, question_count: 5, difficulty: "auto", language: "ru" });
-    setQuiz(generated);
-    setAnswers({});
-    setCurrentQuestion(0);
-    setScreen("quiz");
-    setLoading(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    try {
+      const generated = await generateQuiz({ material: material.trim(), question_count: 5, difficulty: "auto", language: "ru" });
+      setQuiz(generated);
+      setAnswers({});
+      setCurrentQuestion(0);
+      setScreen("quiz");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function submitQuiz() {
     if (!quiz || answeredCount !== quiz.questions.length) return;
+    setError("");
     setLoading(true);
     const userAnswers: UserAnswer[] = quiz.questions.map((item) => ({
       question_id: item.id,
       option_id: answers[item.id],
     }));
-    const evaluated = await evaluateQuiz({
-      quiz_id: quiz.quiz_id,
-      material,
-      questions: quiz.questions,
-      answers: userAnswers,
-    });
-    setResult(evaluated);
-    setScreen("result");
-    setLoading(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    try {
+      const evaluated = await evaluateQuiz({
+        quiz_id: quiz.quiz_id,
+        material: material.trim(),
+        questions: quiz.questions,
+        answers: userAnswers,
+      });
+      setResult(evaluated);
+      setScreen("result");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setLoading(false);
+    }
   }
 
   function reset() {
@@ -73,6 +88,7 @@ export default function App() {
     setResult(null);
     setAnswers({});
     setCurrentQuestion(0);
+    setError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -83,7 +99,7 @@ export default function App() {
           <span className="brand-mark">П</span>
           <span>Понимай</span>
         </button>
-        <span className="header-caption">AI-помощник для учёбы</span>
+        <span className="header-caption">{isDemoMode ? "Демо-режим" : "AI-помощник для учёбы"}</span>
       </header>
 
       {screen === "home" && (
@@ -92,9 +108,9 @@ export default function App() {
             <div className="hero-copy">
               <span className="eyebrow">Персональное обучение</span>
               <h1>Не просто учи.<br /><em>Понимай.</em></h1>
-              <p>Добавь учебный материал. AI создаст тест, оценит понимание и объяснит темы, которые стоит повторить.</p>
+              <p>Добавь учебный материал. {isDemoMode ? "В демо-режиме ты пройдёшь пример теста по фотосинтезу." : "AI создаст тест, оценит понимание и объяснит темы, которые стоит повторить."}</p>
               <div className="benefits">
-                <span><b>✓</b> Тест по твоему тексту</span>
+                <span><b>✓</b> {isDemoMode ? "Пример теста" : "Тест по твоему тексту"}</span>
                 <span><b>✓</b> Разбор слабых тем</span>
               </div>
             </div>
@@ -119,17 +135,18 @@ export default function App() {
                 <span>Минимум 100 символов</span>
                 <button type="button" onClick={() => setMaterial(exampleMaterial)}>Вставить пример</button>
               </div>
+              {isDemoMode && <p className="demo-note">Демо: вопросы пока составлены по фотосинтезу, независимо от введённого текста.</p>}
               <p className="error" role="alert">{error}</p>
               <button className="primary" type="button" onClick={startQuiz} disabled={loading}>
                 <span>{loading ? "Анализируем…" : "Создать персональный тест"}</span><span>→</span>
               </button>
-              <p className="privacy">◇ Материал используется только для теста</p>
+              <p className="privacy">◇ Материал нужен для создания теста</p>
             </div>
           </section>
 
           <section className="steps">
             <div><b>01</b><h3>Добавь материал</h3><p>Вставь текст, который хочешь изучить.</p></div>
-            <div><b>02</b><h3>Пройди тест</h3><p>Ответь на вопросы, созданные AI.</p></div>
+            <div><b>02</b><h3>Пройди тест</h3><p>{isDemoMode ? "Ответь на пять вопросов по фотосинтезу." : "Ответь на вопросы, созданные AI."}</p></div>
             <div><b>03</b><h3>Получи разбор</h3><p>Узнай свой уровень и слабые темы.</p></div>
           </section>
         </main>
@@ -167,6 +184,7 @@ export default function App() {
                 </button>
               )}
             </div>
+            {error && <p className="error quiz-error" role="alert">{error}</p>}
           </section>
         </main>
       )}
@@ -175,7 +193,7 @@ export default function App() {
         <main className="workspace result-page">
           <section className="result-summary panel">
             <span className="eyebrow">Шаг 3 из 3 · Результат</span>
-            <div className="score-ring"><strong>{result.score}%</strong><span>{result.correct_count} из {result.total}</span></div>
+            <div className="score-ring"><strong>{Math.round(result.score)}%</strong><span>{result.correct_count} из {result.total}</span></div>
             <h1>{result.score >= 80 ? "Отличная работа!" : result.score >= 50 ? "Хорошая основа" : "Есть над чем поработать"}</h1>
             <p>Уровень понимания: <b>{levelLabels[result.level]}</b></p>
             {result.weak_topics.length > 0 && <div className="topics"><span>Повторить:</span>{result.weak_topics.map((topic) => <b key={topic}>{topic}</b>)}</div>}

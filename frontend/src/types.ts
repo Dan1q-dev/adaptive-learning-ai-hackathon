@@ -43,7 +43,7 @@ export interface EvaluateRequest {
 export interface QuestionFeedback {
   question_id: string;
   is_correct: boolean;
-  selected_option_id: string;
+  selected_option_id: string | null;
   correct_option_id: string;
   explanation: string;
   recommendation: string;

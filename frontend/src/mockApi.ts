@@ -97,7 +97,7 @@ export async function evaluateQuiz(request: EvaluateRequest): Promise<EvaluateRe
     return {
       question_id: question.id,
       is_correct: isCorrect,
-      selected_option_id: selected?.option_id ?? "",
+      selected_option_id: selected?.option_id ?? null,
       correct_option_id: question.correct_option_id,
       explanation: question.explanation,
       recommendation: isCorrect
