@@ -15,3 +15,7 @@ Hackathon prototype of an AI learning service that:
 - `member-3` — workspace for the third teammate.
 
 Work in a personal branch and merge completed changes into `main` through pull requests.
+
+## Shared contract
+
+Before starting work, read [`docs/TEAM_CONTRACT.md`](docs/TEAM_CONTRACT.md). The machine-readable API contract is in [`openapi.yaml`](openapi.yaml).
