@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { evaluateQuiz, generateQuiz } from "./mockApi";
+import { evaluateQuiz, generateQuiz } from "./api";
 import type { EvaluateResponse, GenerateResponse, UserAnswer } from "./types";
 
 type Screen = "home" | "quiz" | "result";
@@ -39,32 +39,43 @@ export default function App() {
     }
     setError("");
     setLoading(true);
-    const generated = await generateQuiz({ material, question_count: 5, difficulty: "auto", language: "ru" });
-    setQuiz(generated);
-    setAnswers({});
-    setCurrentQuestion(0);
-    setScreen("quiz");
-    setLoading(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    try {
+      const generated = await generateQuiz({ material, question_count: 5, difficulty: "auto", language: "ru" });
+      setQuiz(generated);
+      setAnswers({});
+      setCurrentQuestion(0);
+      setScreen("quiz");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Не удалось создать тест.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function submitQuiz() {
     if (!quiz || answeredCount !== quiz.questions.length) return;
+    setError("");
     setLoading(true);
     const userAnswers: UserAnswer[] = quiz.questions.map((item) => ({
       question_id: item.id,
       option_id: answers[item.id],
     }));
-    const evaluated = await evaluateQuiz({
-      quiz_id: quiz.quiz_id,
-      material,
-      questions: quiz.questions,
-      answers: userAnswers,
-    });
-    setResult(evaluated);
-    setScreen("result");
-    setLoading(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    try {
+      const evaluated = await evaluateQuiz({
+        quiz_id: quiz.quiz_id,
+        material,
+        questions: quiz.questions,
+        answers: userAnswers,
+      });
+      setResult(evaluated);
+      setScreen("result");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Не удалось проверить ответы.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   function reset() {
@@ -142,6 +153,7 @@ export default function App() {
             <span className="counter">{answeredCount} / {quiz.questions.length} отвечено</span>
           </section>
           <div className="progress"><span style={{ width: `${progress}%` }} /></div>
+          {error && <p className="error" role="alert">{error}</p>}
           <section className="panel quiz-panel">
             <div className="question-meta"><span>Вопрос {currentQuestion + 1} из {quiz.questions.length}</span><span>{question.topic}</span></div>
             <h2>{question.text}</h2>
